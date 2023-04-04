@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const {DateTime} = require('luxon');
 
 const Schema = mongoose.Schema;
 
@@ -10,21 +11,33 @@ const authorSchema = new Schema({
 });
 
 authorSchema.virtual('name').get(function () {
-   let fullName = "";
+    let fullName = '';
 
-   if (this.first_name && this.family_name) {
-       fullName = `${this.first_name} ${this.family_name}`;
-   }
+    if (this.first_name && this.family_name) {
+        fullName = `${this.first_name} ${this.family_name}`;
+    }
 
-   if (!this.first_name || !this.family_name) {
-       fullName = "";
-   }
+    if (!this.first_name || !this.family_name) {
+        fullName = '';
+    }
 
-   return fullName;
+    return fullName;
 });
 
 authorSchema.virtual('url').get(function () {
-   return `/catalog/author/${this._id}`;
+    return `/catalog/author/${this._id}`;
+});
+
+authorSchema.virtual('lifespan').get(function () {
+    const date_of_birth_formatted = this.date_of_birth
+        ? DateTime.fromJSDate(this.date_of_birth).toLocaleString(DateTime.DATE_MED)
+        : '';
+
+    const date_of_death_formatted = this.date_of_death
+        ? DateTime.fromJSDate(this.date_of_death).toLocaleString(DateTime.DATE_MED)
+        : '';
+
+    return `${date_of_birth_formatted} - ${date_of_death_formatted}`;
 });
 
 const Author = mongoose.model('Author', authorSchema);
