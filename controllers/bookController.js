@@ -1,4 +1,5 @@
 const async = require('async');
+const {body, validationResult} = require('express-validator');
 const Book = require('../models/book');
 const BookInstance = require('../models/bookinstance');
 const Author = require('../models/author');
@@ -75,13 +76,101 @@ exports.detail = (req, res, next) => {
     );
 };
 
-exports.create = (req, res) => {
-    res.send('NOT IMPLEMENTED: Book create');
+exports.create = (req, res, next) => {
+    async.parallel(
+        {
+            authors(callback) {
+                Author.find(callback);
+            },
+            genres(callback) {
+                Genre.find(callback);
+            },
+        },
+        (err, results) => {
+            if (err) return next(err);
+
+            res.render('book/form', {
+                title: 'Create Book',
+                authors: results.authors,
+                genres: results.genres,
+            });
+        },
+    );
 }
 
-exports.store = (req, res) => {
-    res.send('NOT IMPLEMENTED: Book store');
-}
+exports.store = [
+    (req, res, next) => {
+        if (!Array.isArray(req.body.genre)) {
+            req.body.genre = typeof req.body.genre !== 'undefined'
+                ? [req.body.genre]
+                : [];
+        }
+
+        next();
+    },
+    body('title', 'Title must not be empty.')
+        .trim()
+        .isLength({min: 1})
+        .escape(),
+    body('author', 'Author must not be empty.')
+        .trim()
+        .isLength({min: 1})
+        .escape(),
+    body('summary', 'Summary must not be empty.')
+        .trim()
+        .isLength({min: 1})
+        .escape(),
+    body('isbn', 'ISBN must not be empty')
+        .trim()
+        .isLength({min: 1})
+        .escape(),
+    body('genre.*').escape(),
+    (req, res, next) => {
+        const errors = validationResult(req);
+
+        const {title, author, summary, isbn, genre} = req.body;
+
+        const book = new Book({title, author, summary, isbn, genre});
+
+        if (!errors.isEmpty()) {
+            async.parallel(
+                {
+                    authors(callback) {
+                        Author.find(callback);
+                    },
+                    genres(callback) {
+                        Genre.find(callback);
+                    },
+                },
+                (err, results) => {
+                    if (err) return next(err);
+
+                    for (const genre of results.genres) {
+                        if (book.genre.includes(genre._id)) {
+                            genre.checked = 'true';
+                        }
+                    }
+
+                    res.render('book/form', {
+                        title: 'Create Book',
+                        authors: results.authors,
+                        genres: results.genres,
+                        book,
+                        errors: errors.array(),
+                    });
+                },
+            );
+
+            return;
+        }
+
+        book.save((err) => {
+            if (err) return next(err);
+
+            res.redirect(book.url);
+        })
+    }
+];
 
 exports.edit = (req, res) => {
     res.send('NOT IMPLEMENTED: Book edit');
