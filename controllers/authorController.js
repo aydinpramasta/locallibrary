@@ -104,40 +104,60 @@ exports.update = (req, res) => {
     res.send('NOT IMPLEMENTED: Author update');
 }
 
-exports.delete = async (req, res) => {
-    const [author, booksByAuthor] = await Promise.all([
-        Author.findById(req.params.id).exec(),
-        Book.find({author: req.params.id}, "title summary").exec(),
-    ]);
+exports.delete = (req, res, next) => {
+    async.parallel(
+        {
+            author(callback) {
+                Author.findById(req.params.id).exec(callback);
+            },
+            booksByAuthor(callback) {
+                Book.find({author: req.params.id}, "title summary").exec(callback);
+            },
+        },
+        (err, results) => {
+            if (err) return next(err);
 
-    if (author === null) {
-        res.redirect('/catalog/authors');
-        return;
-    }
+            if (results.author === null) {
+                res.redirect('/catalog/authors');
+                return;
+            }
 
-    res.render('author/delete', {
-        title: 'Delete Author',
-        author,
-        booksByAuthor,
-    });
+            res.render('author/delete', {
+                title: 'Delete Author',
+                author: results.author,
+                booksByAuthor: results.booksByAuthor,
+            });
+        },
+    );
 }
 
-exports.destroy = async (req, res) => {
-    const [author, booksByAuthor] = await Promise.all([
-        Author.findById(req.params.id).exec(),
-        Book.find({author: req.params.id}, "title summary").exec(),
-    ]);
+exports.destroy = (req, res, next) => {
+    async.parallel(
+        {
+            author(callback) {
+                Author.findById(req.params.id).exec(callback);
+            },
+            booksByAuthor(callback) {
+                Book.find({author: req.params.id}, "title summary").exec(callback);
+            },
+        },
+        async (err, results) => {
+            if (err) return next(err);
 
-    if (booksByAuthor.length > 0) {
-        res.render('author/delete', {
-            title: 'Delete Author',
-            author,
-            booksByAuthor,
-        });
-        return;
-    }
+            const {author, booksByAuthor} = results;
 
-    await Author.findByIdAndRemove(req.body.authorId);
+            if (booksByAuthor.length > 0) {
+                res.render('author/delete', {
+                    title: 'Delete Author',
+                    author,
+                    booksByAuthor,
+                });
+                return;
+            }
 
-    res.redirect('/catalog/authors');
+            await Author.findByIdAndRemove(req.body.authorId);
+
+            res.redirect('/catalog/authors');
+        },
+    );
 }
