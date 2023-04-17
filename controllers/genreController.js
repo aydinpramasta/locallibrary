@@ -2,6 +2,7 @@ const async = require('async');
 const {body, validationResult} = require('express-validator');
 const Genre = require('../models/genre');
 const Book = require('../models/book');
+const Author = require("../models/author");
 
 exports.list = (req, res, next) => {
     Genre.find()
@@ -93,10 +94,60 @@ exports.update = (req, res) => {
     res.send('NOT IMPLEMENTED: Genre update');
 }
 
-exports.delete = (req, res) => {
-    res.send('NOT IMPLEMENTED: Genre delete');
+exports.delete = (req, res, next) => {
+    async.parallel(
+        {
+            genre(callback) {
+                Genre.findById(req.params.id).exec(callback);
+            },
+            booksByGenre(callback) {
+                Book.find({genre: req.params.id}, "title summary").exec(callback);
+            },
+        },
+        (err, results) => {
+            if (err) return next(err);
+
+            if (results.author === null) {
+                res.redirect('/catalog/genres');
+                return;
+            }
+
+            res.render('genre/delete', {
+                title: 'Delete Genre',
+                genre: results.genre,
+                booksByGenre: results.booksByGenre,
+            });
+        },
+    );
 }
 
-exports.destroy = (req, res) => {
-    res.send('NOT IMPLEMENTED: Genre destroy');
+exports.destroy = (req, res, next) => {
+    async.parallel(
+        {
+            genre(callback) {
+                Genre.findById(req.params.id).exec(callback);
+            },
+            booksByGenre(callback) {
+                Book.find({genre: req.params.id}, "title summary").exec(callback);
+            },
+        },
+        async (err, results) => {
+            if (err) return next(err);
+
+            const {genre, booksByGenre} = results;
+
+            if (booksByGenre.length > 0) {
+                res.render('genre/delete', {
+                    title: 'Delete Genre',
+                    genre,
+                    booksByGenre,
+                });
+                return;
+            }
+
+            await Genre.findByIdAndRemove(req.body.genreId);
+
+            res.redirect('/catalog/genres');
+        },
+    );
 }

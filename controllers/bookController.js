@@ -300,10 +300,62 @@ exports.update = [
     },
 ];
 
-exports.delete = (req, res) => {
-    res.send('NOT IMPLEMENTED: Book delete');
+exports.delete = (req, res, next) => {
+    async.parallel(
+        {
+            book(callback) {
+                Book.findById(req.params.id)
+                    .populate(['author', 'genre'])
+                    .exec(callback);
+            },
+            bookInstancesByBook(callback) {
+                BookInstance.find({book: req.params.id}).exec(callback);
+            },
+        },
+        (err, results) => {
+            if (err) return next(err);
+
+            if (results.book === null) {
+                res.redirect('/catalog/books');
+                return;
+            }
+
+            res.render('book/delete', {
+                title: 'Delete Book',
+                book: results.book,
+                bookInstancesByBook: results.bookInstancesByBook,
+            });
+        },
+    );
 }
 
-exports.destroy = (req, res) => {
-    res.send('NOT IMPLEMENTED: Book destroy');
+exports.destroy = (req, res, next) => {
+    async.parallel(
+        {
+            book(callback) {
+                Book.findById(req.params.id).exec(callback);
+            },
+            bookInstancesByBook(callback) {
+                BookInstance.find({book: req.params.id}).exec(callback);
+            },
+        },
+        async (err, results) => {
+            if (err) return next(err);
+
+            const {book, bookInstancesByBook} = results;
+
+            if (bookInstancesByBook.length > 0) {
+                res.render('book/delete', {
+                    title: 'Delete Book',
+                    book,
+                    bookInstancesByBook,
+                });
+                return;
+            }
+
+            await Book.findByIdAndRemove(req.body.bookId);
+
+            res.redirect('/catalog/books');
+        },
+    );
 }

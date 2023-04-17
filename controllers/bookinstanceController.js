@@ -1,6 +1,8 @@
 const BookInstance = require('../models/bookinstance');
 const Book = require('../models/book');
 const {body, validationResult} = require('express-validator');
+const async = require("async");
+const Author = require("../models/author");
 
 exports.list = (req, res, next) => {
     BookInstance.find()
@@ -99,10 +101,26 @@ exports.update = (req, res) => {
     res.send('NOT IMPLEMENTED: BookInstance update');
 }
 
-exports.delete = (req, res) => {
-    res.send('NOT IMPLEMENTED: BookInstance delete');
+exports.delete = (req, res, next) => {
+    BookInstance.findById(req.params.id)
+        .populate('book')
+        .exec((err, bookInstance) => {
+            if (err) return next(err);
+
+            if (bookInstance === null) {
+                res.redirect('/catalog/book-instances');
+                return;
+            }
+
+            res.render('book-instance/delete', {
+                title: `Delete Copy: ${bookInstance.book.title}`,
+                bookInstance,
+            });
+        });
 }
 
-exports.destroy = (req, res) => {
-    res.send('NOT IMPLEMENTED: BookInstance destroy');
+exports.destroy = async (req, res) => {
+    await BookInstance.findByIdAndRemove(req.body.bookInstanceId);
+
+    res.redirect('/catalog/book-instances');
 }
