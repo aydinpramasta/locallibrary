@@ -2,7 +2,6 @@ const async = require('async');
 const {body, validationResult} = require('express-validator');
 const Genre = require('../models/genre');
 const Book = require('../models/book');
-const Author = require("../models/author");
 
 exports.list = (req, res, next) => {
     Genre.find()
@@ -48,7 +47,7 @@ exports.detail = (req, res, next) => {
 
 exports.create = (req, res) => {
     res.render('genre/form', {title: 'Create Genre'});
-}
+};
 
 exports.store = [
     body('name', 'Genre name required')
@@ -86,13 +85,60 @@ exports.store = [
     },
 ];
 
-exports.edit = (req, res) => {
-    res.send('NOT IMPLEMENTED: Genre edit');
-}
+exports.edit = (req, res, next) => {
+    Genre.findById(req.params.id).exec((err, genre) => {
+        if (err) return next(err);
 
-exports.update = (req, res) => {
-    res.send('NOT IMPLEMENTED: Genre update');
-}
+        if (genre === null) {
+            err = new Error('Genre not found');
+            err.status = 404;
+
+            return next(err);
+        }
+
+        res.render('genre/form', {
+            title: 'Update Genre',
+            genre,
+        });
+    });
+};
+
+exports.update = [
+    body('name', 'Genre name required')
+        .trim()
+        .isLength({min: 1})
+        .escape(),
+    (req, res, next) => {
+        const errors = validationResult(req);
+
+        const genre = new Genre({
+            _id: req.params.id,
+            name: req.body.name,
+        });
+
+        if (!errors.isEmpty()) {
+            res.render('genre/form', {
+                title: 'Update Genre',
+                genre,
+                errors: errors.array(),
+            });
+            return;
+        }
+
+        Genre.findOne({name: req.body.name}).exec(async (err, genreFound) => {
+            if (err) return next(err);
+
+            if (genreFound) {
+                res.redirect(genreFound.url);
+                return;
+            }
+
+            const updatedGenre = await Genre.findByIdAndUpdate(req.params.id, genre, {});
+
+            res.redirect(updatedGenre.url);
+        });
+    },
+];
 
 exports.delete = (req, res, next) => {
     async.parallel(
@@ -119,7 +165,7 @@ exports.delete = (req, res, next) => {
             });
         },
     );
-}
+};
 
 exports.destroy = (req, res, next) => {
     async.parallel(
@@ -150,4 +196,4 @@ exports.destroy = (req, res, next) => {
             res.redirect('/catalog/genres');
         },
     );
-}
+};

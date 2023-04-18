@@ -96,7 +96,7 @@ exports.create = (req, res, next) => {
             });
         },
     );
-}
+};
 
 exports.store = [
     (req, res, next) => {
@@ -216,7 +216,7 @@ exports.edit = (req, res, next) => {
             });
         },
     );
-}
+};
 
 exports.update = [
     (req, res, next) => {
@@ -327,7 +327,7 @@ exports.delete = (req, res, next) => {
             });
         },
     );
-}
+};
 
 exports.destroy = (req, res, next) => {
     async.parallel(
@@ -358,4 +358,4 @@ exports.destroy = (req, res, next) => {
             res.redirect('/catalog/books');
         },
     );
-}
+};

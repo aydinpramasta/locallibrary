@@ -12,10 +12,10 @@ block content
             input#family_name.form-control(type='text', name='family_name', required, value=(author === undefined ? '' : author.family_name))
 
             label.mt-3(for='date_of_birth') Date of Birth:
-            input#date_of_birth.form-control(type='date', name='date_of_birth', value=(author === undefined ? '' : author.date_of_birth))
+            input#date_of_birth.form-control(type='date', name='date_of_birth', value=(author === undefined ? '' : author.date_of_birth_form))
 
             label.mt-3(for='date_of_death') Date of Death:
-            input#date_of_death.form-control(type='date', name='date_of_death', value=(author === undefined ? '' : author.date_of_death))
+            input#date_of_death.form-control(type='date', name='date_of_death', value=(author === undefined ? '' : author.date_of_death_form))
 
             button.btn.btn-primary.my-3(type='submit') Submit
 

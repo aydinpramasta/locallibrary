@@ -47,7 +47,7 @@ exports.detail = (req, res, next) => {
 
 exports.create = (req, res) => {
     res.render('author/form', {title: 'Create Author'});
-}
+};
 
 exports.store = [
     body('first_name')
@@ -96,13 +96,74 @@ exports.store = [
     },
 ];
 
-exports.edit = (req, res) => {
-    res.send('NOT IMPLEMENTED: Author edit');
-}
+exports.edit = (req, res, next) => {
+    Author.findById(req.params.id).exec((err, author) => {
+        if (err) return next(err);
 
-exports.update = (req, res) => {
-    res.send('NOT IMPLEMENTED: Author update');
-}
+        if (author === null) {
+            err = new Error('Author not found');
+            err.status = 404;
+
+            return next(err);
+        }
+
+        res.render('author/form', {
+            title: 'Update Author',
+            author,
+        });
+    });
+};
+
+exports.update = [
+    body('first_name')
+        .trim()
+        .isLength({min: 1})
+        .escape()
+        .withMessage('First name must be specified.')
+        .isAlphanumeric()
+        .withMessage('First name has non-alphanumeric characters.'),
+    body('family_name')
+        .trim()
+        .isLength({min: 1})
+        .escape()
+        .withMessage('Family name must be specified.')
+        .isAlphanumeric()
+        .withMessage('Family name has non-alphanumeric characters.'),
+    body('date_of_birth', 'Invalid date of birth.')
+        .optional({checkFalsy: true})
+        .isISO8601()
+        .toDate(),
+    body('date_of_death', 'Invalid date of death.')
+        .optional({checkFalsy: true})
+        .isISO8601()
+        .toDate(),
+    async (req, res, next) => {
+        const errors = validationResult(req);
+
+        const {first_name, family_name, date_of_birth, date_of_death} = req.body;
+
+        const author = new Author({
+            _id: req.params.id,
+            first_name,
+            family_name,
+            date_of_birth,
+            date_of_death,
+        });
+
+        if (!errors.isEmpty()) {
+            res.render('author/form', {
+                title: 'Update Author',
+                author,
+                errors: errors.array(),
+            });
+            return;
+        }
+
+        const updatedAuthor = await Author.findByIdAndUpdate(req.params.id, author, {});
+
+        res.redirect(updatedAuthor.url);
+    },
+];
 
 exports.delete = (req, res, next) => {
     async.parallel(
@@ -129,7 +190,7 @@ exports.delete = (req, res, next) => {
             });
         },
     );
-}
+};
 
 exports.destroy = (req, res, next) => {
     async.parallel(
@@ -160,4 +221,4 @@ exports.destroy = (req, res, next) => {
             res.redirect('/catalog/authors');
         },
     );
-}
+};

@@ -6,9 +6,9 @@ block content
     form(method='POST')
         div.form-group
             label(for='book') Book:
-            select#book.form-control(type='select', placeholder='Select book', name='book', required)
+            select#book.form-control(name='book', required)
                 for book in books
-                    option(value=book._id, selected=(selectedBook == book._id.toString() ? 'selected' : false) ) #{book.title}
+                    option(value=book._id, selected=(selectedBook == book._id.toString() ? 'selected' : false)) #{book.title}
 
         div.form-group
             label(for='imprint') Imprint:
@@ -16,11 +16,11 @@ block content
 
         div.form-group
             label(for='due_back') Date when book available:
-            input#due_back.form-control(type='date', name='due_back', value=(bookInstance !== undefined ? bookInstance.due_back : ''))
+            input#due_back.form-control(type='date', name='due_back', value=(bookInstance !== undefined ? bookInstance.due_back_form : ''))
 
         div.form-group
             label(for='status') Status:
-            select#status.form-control(type='select', placeholder='Select status', name='status', required)
+            select#status.form-control(name='status', required)
                 option(value='Maintenance') Maintenance
                 option(value='Available') Available
                 option(value='Loaned') Loaned
