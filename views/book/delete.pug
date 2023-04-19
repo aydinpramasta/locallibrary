@@ -14,12 +14,12 @@ block content
             if index < book.genre.length - 1
                 | ,
 
-    if bookInstancesByBook.length
+    if book_instances_by_book.length
         p #[strong Delete the following book instances before attempting to delete this book.]
             div.ml-4.mt-4
                 h4 Book Instances
 
-                each bookInstance in bookInstancesByBook
+                each bookInstance in book_instances_by_book
                     hr
                     if bookInstance.status == 'Available'
                         p.text-success #{bookInstance.status}

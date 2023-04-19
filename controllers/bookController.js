@@ -5,33 +5,38 @@ const BookInstance = require('../models/bookinstance');
 const Author = require('../models/author');
 const Genre = require('../models/genre');
 
-exports.index = (req, res) => {
-    async.parallel(
-        {
-            book_count(callback) {
-                Book.countDocuments({}, callback);
-            },
-            book_instance_count(callback) {
-                BookInstance.countDocuments({}, callback);
-            },
-            book_instance_available_count(callback) {
-                BookInstance.countDocuments({status: 'Available'}, callback);
-            },
-            author_count(callback) {
-                Author.countDocuments({}, callback);
-            },
-            genre_count(callback) {
-                Genre.countDocuments({}, callback);
-            },
-        },
-        (err, results) => {
-            res.render('index', {
-                title: 'Local Library Home',
-                error: err,
-                data: results,
-            });
-        },
-    );
+exports.index = async (req, res) => {
+    const [
+        book_count,
+        book_instance_count,
+        book_instance_available_count,
+        author_count,
+        genre_count,
+    ] = await Promise.all([
+        Book.countDocuments(),
+        BookInstance.countDocuments(),
+        BookInstance.countDocuments({status: 'Available'}),
+        Author.countDocuments(),
+        Genre.countDocuments(),
+    ]).catch((error) => {
+        res.render('index', {
+            title: 'Local Library Home',
+            error,
+        });
+    });
+
+    const data = {
+        book_count,
+        book_instance_count,
+        book_instance_available_count,
+        author_count,
+        genre_count,
+    };
+
+    res.render('index', {
+        title: 'Local Library Home',
+        data,
+    });
 };
 
 exports.list = (req, res, next) => {
@@ -45,57 +50,39 @@ exports.list = (req, res, next) => {
         });
 };
 
-exports.detail = (req, res, next) => {
-    async.parallel(
-        {
-            book(callback) {
-                Book.findById(req.params.id)
-                    .populate(['author', 'genre'])
-                    .exec(callback);
-            },
-            book_instances(callback) {
-                BookInstance.find({book: req.params.id}).exec(callback);
-            },
-        },
-        (err, results) => {
-            if (err) return next(err);
+exports.detail = async (req, res, next) => {
+    const [book, book_instances] = await Promise.all([
+        Book.findById(req.params.id)
+            .populate(['author', 'genre'])
+            .exec(),
+        BookInstance.find({book: req.params.id}).exec(),
+    ]).catch((error) => next(error));
 
-            if (results.book === null) {
-                err = new Error('Book not found');
-                err.status = 404;
+    if (book === null) {
+        const error = new Error('Book not found');
+        error.status = 404;
 
-                return next(err);
-            }
+        return next(error);
+    }
 
-            res.render('book/detail', {
-                title: 'Book Detail',
-                book: results.book,
-                book_instances: results.book_instances,
-            });
-        },
-    );
+    res.render('book/detail', {
+        title: 'Book Detail',
+        book,
+        book_instances,
+    });
 };
 
-exports.create = (req, res, next) => {
-    async.parallel(
-        {
-            authors(callback) {
-                Author.find(callback);
-            },
-            genres(callback) {
-                Genre.find(callback);
-            },
-        },
-        (err, results) => {
-            if (err) return next(err);
+exports.create = async (req, res, next) => {
+    const [authors, genres] = await Promise.all([
+        Author.find(),
+        Genre.find(),
+    ]).catch((error) => next(error));
 
-            res.render('book/form', {
-                title: 'Create Book',
-                authors: results.authors,
-                genres: results.genres,
-            });
-        },
-    );
+    res.render('book/form', {
+        title: 'Create Book',
+        authors,
+        genres,
+    });
 };
 
 exports.store = [
@@ -125,7 +112,7 @@ exports.store = [
         .isLength({min: 1})
         .escape(),
     body('genre.*').escape(),
-    (req, res, next) => {
+    async (req, res, next) => {
         const errors = validationResult(req);
 
         const {title, author, summary, isbn, genre} = req.body;
@@ -133,34 +120,24 @@ exports.store = [
         const book = new Book({title, author, summary, isbn, genre});
 
         if (!errors.isEmpty()) {
-            async.parallel(
-                {
-                    authors(callback) {
-                        Author.find(callback);
-                    },
-                    genres(callback) {
-                        Genre.find(callback);
-                    },
-                },
-                (err, results) => {
-                    if (err) return next(err);
+            const [authors, genres] = await Promise.all([
+                Author.find(),
+                Genre.find(),
+            ]).catch((error) => next(error));
 
-                    for (const genre of results.genres) {
-                        if (book.genre.includes(genre._id)) {
-                            genre.checked = 'true';
-                        }
-                    }
+            for (const genre of genres) {
+                if (book.genre.includes(genre._id)) {
+                    genre.checked = 'true';
+                }
+            }
 
-                    res.render('book/form', {
-                        title: 'Create Book',
-                        authors: results.authors,
-                        genres: results.genres,
-                        book,
-                        errors: errors.array(),
-                    });
-                },
-            );
-
+            res.render('book/form', {
+                title: 'Create Book',
+                authors,
+                genres,
+                book,
+                errors: errors.array(),
+            });
             return;
         }
 
@@ -172,61 +149,46 @@ exports.store = [
     }
 ];
 
-exports.edit = (req, res, next) => {
-    async.parallel(
-        {
-            book(callback) {
-                Book.findById(req.params.id)
-                    .populate('author')
-                    .populate('genre')
-                    .exec(callback);
-            },
-            authors(callback) {
-                Author.find().exec(callback);
-            },
-            genres(callback) {
-                Genre.find().exec(callback);
-            },
-        },
-        (err, results) => {
-            if (err) return next(err);
+exports.edit = async (req, res, next) => {
+    const [book, authors, genres] = await Promise.all([
+        Book.findById(req.params.id)
+            .populate(['author', 'genre'])
+            .exec(),
+        Author.find(),
+        Genre.find(),
+    ]).catch((error) => next(error));
 
-            const {book, authors, genres} = results;
+    if (book === null) {
+        const error = new Error('Book not found');
+        error.status = 404;
 
-            if (book === null) {
-                err = new Error('Book not found');
-                err.status = 404;
+        return next(error);
+    }
 
-                return next(err);
+    for (const genre of genres) {
+        for (const book_genre of book.genre) {
+            if (genre._id.toString() === book_genre._id.toString()) {
+                genre.checked = 'true';
             }
+        }
+    }
 
-            for (const genre of genres) {
-                for (const bookGenre of book.genre) {
-                    if (genre._id.toString() === bookGenre._id.toString()) {
-                        genre.checked = 'true';
-                    }
-                }
-            }
-
-            res.render('book/form', {
-                title: 'Update Book',
-                book,
-                authors,
-                genres,
-            });
-        },
-    );
+    res.render('book/form', {
+        title: 'Update Book',
+        book,
+        authors,
+        genres,
+    });
 };
 
 exports.update = [
     (req, res, next) => {
-        if (!req.body.genre instanceof Array) {
-            if (typeof req.body.genre === "undefined") {
-                req.body.genre = [];
-            } else {
-                req.body.genre = new Array(req.body.genre);
-            }
+        if (!Array.isArray(req.body.genre)) {
+            req.body.genre = typeof req.body.genre !== 'undefined'
+                ? [req.body.genre]
+                : [];
         }
+
         next();
     },
     body("title", "Title must not be empty.")
@@ -261,72 +223,51 @@ exports.update = [
         });
 
         if (!errors.isEmpty()) {
-            async.parallel(
-                {
-                    authors(callback) {
-                        Author.find().exec(callback);
-                    },
-                    genres(callback) {
-                        Genre.find().exec(callback);
-                    },
-                },
-                (err, results) => {
-                    if (err) return next(err);
+            const [authors, genres] = await Promise.all([
+                Author.find(),
+                Genre.find(),
+            ]).catch((error) => next(error));
 
-                    const {authors, genres} = results;
+            for (const genre of genres) {
+                if (book.genre.indexOf(genre._id) > -1) {
+                    genre.checked = "true";
+                }
+            }
 
-                    for (const genre of genres) {
-                        if (book.genre.indexOf(genre._id) > -1) {
-                            genre.checked = "true";
-                        }
-                    }
-
-                    res.render('book/form', {
-                        title: 'Update Book',
-                        book,
-                        authors,
-                        genres,
-                        errors: errors.array(),
-                    });
-                },
-            );
-
+            res.render('book/form', {
+                title: 'Update Book',
+                authors,
+                genres,
+                book,
+                errors: errors.array(),
+            });
             return;
         }
 
-        const updatedBook = await Book.findByIdAndUpdate(req.params.id, book, {});
+        const updatedBook = await Book.findByIdAndUpdate(req.params.id, book);
 
         res.redirect(updatedBook.url);
     },
 ];
 
-exports.delete = (req, res, next) => {
-    async.parallel(
-        {
-            book(callback) {
-                Book.findById(req.params.id)
-                    .populate(['author', 'genre'])
-                    .exec(callback);
-            },
-            bookInstancesByBook(callback) {
-                BookInstance.find({book: req.params.id}).exec(callback);
-            },
-        },
-        (err, results) => {
-            if (err) return next(err);
+exports.delete = async (req, res, next) => {
+    const [book, book_instances_by_book] = await Promise.all([
+        Book.findById(req.params.id)
+            .populate(['author', 'genre'])
+            .exec(),
+        BookInstance.find({book: req.params.id}).exec(),
+    ]).catch((error) => next(error));
 
-            if (results.book === null) {
-                res.redirect('/catalog/books');
-                return;
-            }
+    if (book === null) {
+        res.redirect('/catalog/books');
+        return;
+    }
 
-            res.render('book/delete', {
-                title: 'Delete Book',
-                book: results.book,
-                bookInstancesByBook: results.bookInstancesByBook,
-            });
-        },
-    );
+    res.render('book/delete', {
+        title: 'Delete Book',
+        book,
+        book_instances_by_book,
+    });
 };
 
 exports.destroy = (req, res, next) => {
