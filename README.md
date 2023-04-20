@@ -25,3 +25,5 @@ echo "MONGODB_URL=mongodb://localhost/learn_expressjs" > .env
 # Start the application
 npm run start
 ```
+
+> To stop the application, you can run `npm run stop`
