@@ -270,33 +270,22 @@ exports.delete = async (req, res, next) => {
     });
 };
 
-exports.destroy = (req, res, next) => {
-    async.parallel(
-        {
-            book(callback) {
-                Book.findById(req.params.id).exec(callback);
-            },
-            bookInstancesByBook(callback) {
-                BookInstance.find({book: req.params.id}).exec(callback);
-            },
-        },
-        async (err, results) => {
-            if (err) return next(err);
+exports.destroy = async (req, res, next) => {
+    const [book, book_instances_by_book] = await Promise.all([
+        Book.findById(req.params.id).exec(),
+        BookInstance.find({book: req.params.id}).exec(),
+    ]).catch((error) => next(error));
 
-            const {book, bookInstancesByBook} = results;
+    if (book_instances_by_book.length > 0) {
+        res.render('book/delete', {
+            title: 'Delete Book',
+            book,
+            book_instances_by_book,
+        });
+        return;
+    }
 
-            if (bookInstancesByBook.length > 0) {
-                res.render('book/delete', {
-                    title: 'Delete Book',
-                    book,
-                    bookInstancesByBook,
-                });
-                return;
-            }
+    await Book.findByIdAndRemove(req.params.id);
 
-            await Book.findByIdAndRemove(req.body.bookId);
-
-            res.redirect('/catalog/books');
-        },
-    );
+    res.redirect('/catalog/books');
 };
