@@ -16,33 +16,24 @@ exports.list = (req, res, next) => {
         });
 };
 
-exports.detail = (req, res, next) => {
-    async.parallel(
-        {
-            author(callback) {
-                Author.findById(req.params.id).exec(callback);
-            },
-            author_books(callback) {
-                Book.find({author: req.params.id}, 'title summary').exec(callback);
-            },
-        },
-        (err, results) => {
-            if (err) return next(err);
+exports.detail = async (req, res, next) => {
+    const [author, author_books] = await Promise.all([
+        Author.findById(req.params.id).exec(),
+        Book.find({author: req.params.id}, 'title summary').exec(),
+    ]).catch((error) => next(error));
 
-            if (results.author === null) {
-                err = new Error('Author not found');
-                err.status = 404;
+    if (author === null) {
+        const error = new Error('Author not found');
+        error.status = 404;
 
-                return next(err);
-            }
+        return next(error);
+    }
 
-            res.render('author/detail', {
-                title: 'Author Detail',
-                author: results.author,
-                author_books: results.author_books,
-            });
-        },
-    );
+    res.render('author/detail', {
+        title: 'Author Detail',
+        author,
+        author_books,
+    });
 };
 
 exports.create = (req, res) => {
@@ -165,60 +156,40 @@ exports.update = [
     },
 ];
 
-exports.delete = (req, res, next) => {
-    async.parallel(
-        {
-            author(callback) {
-                Author.findById(req.params.id).exec(callback);
-            },
-            booksByAuthor(callback) {
-                Book.find({author: req.params.id}, "title summary").exec(callback);
-            },
-        },
-        (err, results) => {
-            if (err) return next(err);
+exports.delete = async (req, res, next) => {
+    const [author, author_books] = await Promise.all([
+        Author.findById(req.params.id).exec(),
+        Book.find({author: req.params.id}, 'title summary').exec(),
+    ]).catch((error) => next(error));
 
-            if (results.author === null) {
-                res.redirect('/catalog/authors');
-                return;
-            }
+    if (author === null) {
+        res.redirect('/catalog/authors');
+        return;
+    }
 
-            res.render('author/delete', {
-                title: 'Delete Author',
-                author: results.author,
-                booksByAuthor: results.booksByAuthor,
-            });
-        },
-    );
+    res.render('author/delete', {
+        title: 'Delete Author',
+        author,
+        author_books,
+    });
 };
 
-exports.destroy = (req, res, next) => {
-    async.parallel(
-        {
-            author(callback) {
-                Author.findById(req.params.id).exec(callback);
-            },
-            booksByAuthor(callback) {
-                Book.find({author: req.params.id}, "title summary").exec(callback);
-            },
-        },
-        async (err, results) => {
-            if (err) return next(err);
+exports.destroy = async (req, res, next) => {
+    const [author, author_books] = await Promise.all([
+        Author.findById(req.params.id).exec(),
+        Book.find({author: req.params.id}, 'title summary').exec(),
+    ]).catch((error) => next(error));
 
-            const {author, booksByAuthor} = results;
+    if (author_books.length > 0) {
+        res.render('author/delete', {
+            title: 'Delete Author',
+            author,
+            author_books,
+        });
+        return;
+    }
 
-            if (booksByAuthor.length > 0) {
-                res.render('author/delete', {
-                    title: 'Delete Author',
-                    author,
-                    booksByAuthor,
-                });
-                return;
-            }
+    await Author.findByIdAndRemove(req.params.id);
 
-            await Author.findByIdAndRemove(req.body.authorId);
-
-            res.redirect('/catalog/authors');
-        },
-    );
+    res.redirect('/catalog/authors');
 };
