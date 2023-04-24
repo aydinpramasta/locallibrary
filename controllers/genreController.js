@@ -16,33 +16,24 @@ exports.list = (req, res, next) => {
         });
 };
 
-exports.detail = (req, res, next) => {
-    async.parallel(
-        {
-            genre(callback) {
-                Genre.findById(req.params.id).exec(callback);
-            },
-            genre_books(callback) {
-                Book.find({genre: req.params.id}).exec(callback);
-            },
-        },
-        (err, results) => {
-            if (err) return next(err);
+exports.detail = async (req, res, next) => {
+    const [genre, genre_books] = await Promise.all([
+        Genre.findById(req.params.id).exec(),
+        Book.find({genre: req.params.id}).exec(),
+    ]).catch((error) => next(error));
 
-            if (results.genre === null) {
-                err = new Error('Genre not found');
-                err.status = 404;
+    if (genre === null) {
+        const error = new Error('Genre not found');
+        error.status = 404;
 
-                return next(err);
-            }
+        return next(error);
+    }
 
-            res.render('genre/detail', {
-                title: 'Genre Detail',
-                genre: results.genre,
-                genre_books: results.genre_books,
-            });
-        },
-    );
+    res.render('genre/detail', {
+        title: 'Genre Detail',
+        genre,
+        genre_books,
+    });
 };
 
 exports.create = (req, res) => {
@@ -68,11 +59,11 @@ exports.store = [
             return;
         }
 
-        Genre.findOne({name: req.body.name}).exec((err, genreFound) => {
+        Genre.findOne({name: req.body.name}).exec((err, genre_found) => {
             if (err) return next(err);
 
-            if (genreFound) {
-                res.redirect(genreFound.url);
+            if (genre_found) {
+                res.redirect(genre_found.url);
                 return;
             }
 
@@ -125,11 +116,11 @@ exports.update = [
             return;
         }
 
-        Genre.findOne({name: req.body.name}).exec(async (err, genreFound) => {
+        Genre.findOne({name: req.body.name}).exec(async (err, genre_found) => {
             if (err) return next(err);
 
-            if (genreFound) {
-                res.redirect(genreFound.url);
+            if (genre_found) {
+                res.redirect(genre_found.url);
                 return;
             }
 
@@ -140,60 +131,40 @@ exports.update = [
     },
 ];
 
-exports.delete = (req, res, next) => {
-    async.parallel(
-        {
-            genre(callback) {
-                Genre.findById(req.params.id).exec(callback);
-            },
-            booksByGenre(callback) {
-                Book.find({genre: req.params.id}, "title summary").exec(callback);
-            },
-        },
-        (err, results) => {
-            if (err) return next(err);
+exports.delete = async (req, res, next) => {
+    const [genre, genre_books] = await Promise.all([
+        Genre.findById(req.params.id).exec(),
+        Book.find({genre: req.params.id}).exec(),
+    ]).catch((error) => next(error));
 
-            if (results.author === null) {
-                res.redirect('/catalog/genres');
-                return;
-            }
+    if (genre === null) {
+        res.redirect('/catalog/genres');
+        return;
+    }
 
-            res.render('genre/delete', {
-                title: 'Delete Genre',
-                genre: results.genre,
-                booksByGenre: results.booksByGenre,
-            });
-        },
-    );
+    res.render('genre/delete', {
+        title: 'Delete Genre',
+        genre,
+        genre_books,
+    });
 };
 
-exports.destroy = (req, res, next) => {
-    async.parallel(
-        {
-            genre(callback) {
-                Genre.findById(req.params.id).exec(callback);
-            },
-            booksByGenre(callback) {
-                Book.find({genre: req.params.id}, "title summary").exec(callback);
-            },
-        },
-        async (err, results) => {
-            if (err) return next(err);
+exports.destroy = async (req, res, next) => {
+    const [genre, genre_books] = await Promise.all([
+        Genre.findById(req.params.id).exec(),
+        Book.find({genre: req.params.id}).exec(),
+    ]).catch((error) => next(error));
 
-            const {genre, booksByGenre} = results;
+    if (genre_books.length > 0) {
+        res.render('genre/delete', {
+            title: 'Delete Genre',
+            genre,
+            genre_books,
+        });
+        return;
+    }
 
-            if (booksByGenre.length > 0) {
-                res.render('genre/delete', {
-                    title: 'Delete Genre',
-                    genre,
-                    booksByGenre,
-                });
-                return;
-            }
+    await Genre.findByIdAndRemove(req.params.id);
 
-            await Genre.findByIdAndRemove(req.body.genreId);
-
-            res.redirect('/catalog/genres');
-        },
-    );
+    res.redirect('/catalog/genres');
 };
