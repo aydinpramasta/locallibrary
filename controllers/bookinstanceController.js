@@ -93,34 +93,25 @@ exports.store = [
     },
 ];
 
-exports.edit = (req, res, next) => {
-    async.parallel(
-        {
-            bookInstance(callback) {
-                BookInstance.findById(req.params.id).populate('book').exec(callback);
-            },
-            books(callback) {
-                Book.find({}, 'title').exec(callback);
-            },
-        },
-        (err, results) => {
-            if (err) return next(err);
+exports.edit = async (req, res, next) => {
+    const [bookInstance, books] = await Promise.all([
+        BookInstance.findById(req.params.id).populate('book').exec(),
+        Book.find({}, 'title').exec(),
+    ]).catch((error) => next(error));
 
-            if (results.bookInstance === null) {
-                err = new Error('Book copy not found');
-                err.status = 404;
+    if (bookInstance === null) {
+        const error = new Error('Book copy not found');
+        error.status = 404;
 
-                return next(err);
-            }
+        return next(error);
+    }
 
-            res.render('book-instance/form', {
-                title: `Update Book Instance: ${results.bookInstance._id}`,
-                bookInstance: results.bookInstance,
-                selectedBook: results.bookInstance.book._id,
-                books: results.books,
-            });
-        },
-    );
+    res.render('book-instance/form', {
+        title: `Update Book Instance: ${bookInstance._id}`,
+        bookInstance,
+        selectedBook: bookInstance.book._id,
+        books,
+    });
 };
 
 exports.update = [
@@ -191,7 +182,7 @@ exports.delete = (req, res, next) => {
 };
 
 exports.destroy = async (req, res) => {
-    await BookInstance.findByIdAndRemove(req.body.bookInstanceId);
+    await BookInstance.findByIdAndRemove(req.params.id);
 
     res.redirect('/catalog/book-instances');
 };
